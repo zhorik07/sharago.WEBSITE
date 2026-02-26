@@ -1,3 +1,4 @@
+// 👇 ВСТАВЬ СЮДА СВОИ ДАННЫЕ SUPABASE
 const SUPABASE_URL = 'https://yxvrudfgpnyahlpbfzru.supabase.co'; 
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4dnJ1ZGZncG55YWhscGJmenJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2NTczODIsImV4cCI6MjA4NjIzMzM4Mn0.7Si7KmFTTV-DRvP04mj3_rpLgHXSRoa9lrruZZ7IcHg';
 
@@ -42,6 +43,7 @@ const translations = {
         footer_disp: "Диспетчерская",
         
         // ГОРОДА
+        city_any: "Любой",
         city_tbilisi: "Тбилиси",
         city_kutaisi: "Кутаиси",
         city_batumi: "Батуми",
@@ -61,7 +63,6 @@ const translations = {
         ph_phone: "Номер телефона",
         alert_success: "Гаумарджос! Бронь принята. Водитель скоро свяжется с вами.",
         
-        // Старые ключи для футера (оставляем, чтобы футер не сломался)
         route_tbi_bat: "Тбилиси - Батуми",
         route_tbi_kut: "Тбилиси - Кутаиси",
         route_tbi_kaz: "Тбилиси - Казбеги",
@@ -77,6 +78,11 @@ const translations = {
         modal_selected: "Выбрано:",
         modal_free_leg: "Св.",
         modal_booked_leg: "Зан.",
+        
+        // ОШИБКИ И ПОИСК
+        empty_rides: "На эту дату/маршрут рейсов пока нет 🚐",
+        empty_rides_hint: "Попробуйте изменить параметры поиска.",
+        alert_same_city: "Брат, пункт отправления и прибытия не могут совпадать!",
         alert_fill_data: "Впиши имя и телефон, брат!",
         alert_short_phone: "Номер телефона слишком короткий, проверь!",
         alert_no_seats: "Выбери хотя бы одно место на схеме!",
@@ -115,6 +121,7 @@ const translations = {
         footer_contact: "Contact",
         footer_disp: "Dispatcher",
         
+        city_any: "Any",
         city_tbilisi: "Tbilisi",
         city_kutaisi: "Kutaisi",
         city_batumi: "Batumi",
@@ -147,6 +154,11 @@ const translations = {
         modal_selected: "Selected:",
         modal_free_leg: "Free",
         modal_booked_leg: "Taken",
+        
+        // ОШИБКИ И ПОИСК
+        empty_rides: "No rides available for this date/route 🚐",
+        empty_rides_hint: "Try changing your search parameters.",
+        alert_same_city: "Departure and arrival cities cannot be the same!",
         alert_fill_data: "Please enter your name and phone number!",
         alert_short_phone: "The phone number is too short, please check!",
         alert_no_seats: "Please select at least one seat on the map!",
@@ -185,6 +197,7 @@ const translations = {
         footer_contact: "კონტაქტი",
         footer_disp: "დისპეტჩერი",
         
+        city_any: "ნებისმიერი",
         city_tbilisi: "თბილისი",
         city_kutaisi: "ქუთაისი",
         city_batumi: "ბათუმი",
@@ -217,6 +230,11 @@ const translations = {
         modal_selected: "არჩეულია:",
         modal_free_leg: "თავ.",
         modal_booked_leg: "დაკ.",
+        
+        // ОШИБКИ И ПОИСК
+        empty_rides: "ამ თარიღზე/მარშრუტზე რეისები ჯერ არ არის 🚐",
+        empty_rides_hint: "სცადეთ ძიების პარამეტრების შეცვლა.",
+        alert_same_city: "გამგზავრების და დანიშნულების ქალაქები არ შეიძლება ემთხვეოდეს!",
         alert_fill_data: "გთხოვთ შეიყვანოთ სახელი და ტელეფონი!",
         alert_short_phone: "ტელეფონის ნომერი ძალიან მოკლეა!",
         alert_no_seats: "გთხოვთ აირჩიოთ მინიმუმ ერთი ადგილი!",
@@ -246,19 +264,34 @@ function getFormattedDateForIndex(offsetDays) {
     return `${year}-${month}-${day}`;
 }
 
-// --- НОВАЯ ЗАГРУЗКА БАЗЫ (С ФИЛЬТРОМ ГОРОДОВ) ---
+// --- УМНАЯ ЗАГРУЗКА БАЗЫ (С ФИЛЬТРОМ ГОРОДОВ И ДАТЫ) ---
 async function fetchRides() {
     const container = document.getElementById('rides-container');
     container.innerHTML = `<div class="text-center py-20"><i class="fa-solid fa-circle-notch fa-spin text-blue-900 text-3xl"></i></div>`;
 
     const targetDateStr = getFormattedDateForIndex(selectedDateIndex);
+    
+    // Считываем то, что сейчас выбрано в выпадающих списках поиска
+    const cityFrom = document.getElementById('search-from').value;
+    const cityTo = document.getElementById('search-to').value;
 
-    // Можно добавить фильтр по городам прямо тут, если диспетчер нажал "Найти"
-    const { data, error } = await sb
-        .from('rides')
-        .select('*')
-        .eq('date', targetDateStr)
-        .order('time', { ascending: true });
+    // Базовый запрос: берем все рейсы на выбранную дату
+    let query = sb.from('rides')
+                  .select('*')
+                  .eq('date', targetDateStr);
+
+    // Если клиент выбрал конкретный город отправления — фильтруем по нему
+    if (cityFrom !== 'any') {
+        query = query.eq('city_from', cityFrom);
+    }
+    
+    // Если клиент выбрал конкретный город прибытия — фильтруем по нему
+    if (cityTo !== 'any') {
+        query = query.eq('city_to', cityTo);
+    }
+
+    // Сортируем по времени
+    const { data, error } = await query.order('time', { ascending: true });
 
     if (error) {
         console.error('Ошибка:', error);
@@ -274,7 +307,6 @@ async function fetchRides() {
             seats: ride.seats_total,
             booked: ride.seats_booked,
             bookedSeats: ride.booked_seats || [], 
-            // НОВАЯ ЛОГИКА: БЕРЕМ ГОРОДА ИЗ БАЗЫ
             cityFrom: ride.city_from,
             cityTo: ride.city_to,
             driverKey: ride.driver_key,
@@ -288,7 +320,12 @@ async function fetchRides() {
         }));
         renderRides();
     } else {
-        container.innerHTML = `<div class="text-center py-12 text-gray-400 font-bold bg-white rounded-3xl border border-gray-100 shadow-sm mt-4">На эту дату рейсов пока нет 🚐<br><span class="text-sm font-normal mt-2 block">Попробуйте выбрать другой день в календаре.</span></div>`;
+        // Красивое переведенное сообщение, если рейсов нет
+        container.innerHTML = `
+        <div class="text-center py-12 text-gray-400 font-bold bg-white rounded-3xl border border-gray-100 shadow-sm mt-4">
+            ${translations[currentLang].empty_rides}<br>
+            <span class="text-sm font-normal mt-2 block">${translations[currentLang].empty_rides_hint}</span>
+        </div>`;
     }
 }
 
@@ -342,7 +379,7 @@ function changeLanguage(lang) {
     
     initCalendar(lang);
     initDateTabs(); 
-    renderRides();
+    fetchRides(); // Перезапрашиваем базу, чтобы обновить сообщения об отсутствии рейсов
 
     if (!document.getElementById('modal').classList.contains('hidden') && currentRideId) {
         const ride = baseRides.find(r => r.id === currentRideId);
@@ -360,6 +397,16 @@ function updateClock() {
 setInterval(updateClock, 1000);
 
 function searchRides() {
+    // 1. Проверяем, не выбрал ли клиент один и тот же город
+    const cityFrom = document.getElementById('search-from').value;
+    const cityTo = document.getElementById('search-to').value;
+    
+    if (cityFrom !== 'any' && cityFrom === cityTo) {
+        alert(translations[currentLang].alert_same_city);
+        return;
+    }
+
+    // 2. Высчитываем дату для календаря сверху
     const selectedDateStr = document.getElementById('search-date').value;
     const selectedDate = new Date(selectedDateStr);
     const today = new Date();
@@ -372,12 +419,13 @@ function searchRides() {
     if (diffDays >= 0 && diffDays < 7) {
         selectedDateIndex = diffDays;
     } else {
-        alert("Пока расписание доступно только на ближайшие 7 дней!");
-        selectedDateIndex = 0;
+        selectedDateIndex = 0; // Если дата слишком далеко, просто кидаем на сегодня (потом можно расширить до месяца)
     }
     
     initDateTabs();
     document.getElementById('schedule').scrollIntoView({ behavior: 'smooth' });
+    
+    // 3. Запускаем умный поиск (функция fetchRides сама считает города из выпадающих списков)
     fetchRides();
 }
 
@@ -412,6 +460,7 @@ function initDateTabs() {
 function selectDate(index) {
     selectedDateIndex = index;
     initDateTabs();
+    // При клике на вкладку даты - снова идем в базу, сохраняя фильтры городов!
     fetchRides();
 }
 
@@ -427,16 +476,12 @@ function renderRides() {
     let ridesHtml = '';
 
     baseRides.forEach(ride => {
-        // --- МАГИЯ СКЛЕИВАНИЯ ГОРОДОВ ИЗ СЛОВАРЯ ---
-        // Ищем в словаре `city_tbilisi`, если нет — выводим просто слово как в базе.
         const cityNameFrom = translations[currentLang]['city_' + ride.cityFrom] || ride.cityFrom;
         const cityNameTo = translations[currentLang]['city_' + ride.cityTo] || ride.cityTo;
-        const routeName = `${cityNameFrom} — ${cityNameTo}`; // Тбилиси — Батуми
+        const routeName = `${cityNameFrom} — ${cityNameTo}`; 
 
         const carName = translations[currentLang][ride.carKey] || ride.carKey;
         const driverName = translations[currentLang][ride.driverKey] || ride.driverKey;
-        
-        // Временно станция захардкожена под Дидубе, но потом тоже можно сделать через базу
         const stationName = translations[currentLang].st_didube;
 
         const [rideH, rideM] = ride.time.split(':').map(Number);
@@ -507,7 +552,6 @@ function openModal(id) {
     const ride = baseRides.find(r => r.id === id);
     if (!ride) return;
     
-    // Склеиваем города для модалки
     const cityNameFrom = translations[currentLang]['city_' + ride.cityFrom] || ride.cityFrom;
     const cityNameTo = translations[currentLang]['city_' + ride.cityTo] || ride.cityTo;
     const routeName = `${cityNameFrom} — ${cityNameTo}`;
@@ -621,7 +665,6 @@ function toggleSeat(seatNum, btn) {
     document.getElementById('selected-seats-count').innerText = currentlySelectedSeats.length;
 }
 
-// Оформление брони
 async function confirmBooking() {
     const name = document.getElementById('p-name').value;
     const phone = document.getElementById('p-phone').value;
@@ -657,7 +700,6 @@ async function confirmBooking() {
     }
 
     if (ride.telegramId) {
-        // Берем РУССКИЙ перевод городов для сообщения в телегу диспетчеру (ему так удобнее)
         const cityNameFromRu = translations['ru']['city_' + ride.cityFrom] || ride.cityFrom;
         const cityNameToRu = translations['ru']['city_' + ride.cityTo] || ride.cityTo;
         const routeTextRu = `${cityNameFromRu} — ${cityNameToRu}`;
@@ -692,7 +734,6 @@ async function confirmBooking() {
     confirmBtn.innerText = translations[currentLang].btn_confirm;
 }
 
-// Запуск
 document.addEventListener('DOMContentLoaded', () => {
     updateClock();
     changeLanguage('ru'); 
